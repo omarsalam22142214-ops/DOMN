@@ -31,7 +31,7 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-        body { background-color: var(--bg-color); color: var(--text-main); transition: all 0.3s ease; height: 100vh; display: flex; flex-direction: column; }
+        body { background-color: var(--bg-color); color: var(--text-main); transition: all 0.3s ease; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         header { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: var(--panel-bg); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
 
@@ -45,7 +45,7 @@
         
         .form-group { margin-bottom: 15px; text-align: right; }
         .form-group label { display: block; margin-bottom: 5px; }
-        .form-group select, .form-group input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; background: #fff; color: #333; }
+        .form-group select, .form-group input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; background: #fff; color: #333; font-weight: bold; }
 
         #game-screen { display: none; flex-direction: column; height: 100%; width: 100%; }
         
@@ -94,6 +94,22 @@
             box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
             padding: 20px;
             scroll-behavior: smooth;
+        }
+
+        /* انيميشن النقط في الأمريكاني */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1.5); }
+        }
+        .points-popup {
+            position: absolute;
+            color: #ffeb3b;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 5px #000;
+            animation: floatUp 1.5s ease-out forwards;
+            z-index: 1000;
+            pointer-events: none;
         }
 
         .player-hand { display: flex; justify-content: center; gap: 10px; padding: 15px; background-color: var(--panel-bg); flex-wrap: wrap; min-height: 140px; align-items: center; }
@@ -159,10 +175,26 @@
         <div class="menu-card">
             <h2>إعدادات اللعب مع البوت</h2>
             <div class="form-group">
+                <label>نوع اللعبة:</label>
+                <select id="off-game-mode">
+                    <option value="normal">عادي (تجميع ورق)</option>
+                    <option value="amricani">أمريكاني (خمسات)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مستوى البوت:</label>
+                <select id="off-bot-level">
+                    <option value="easy">سهل (عشوائي)</option>
+                    <option value="medium">متوسط (بيتخلص من الورق التقيل)</option>
+                    <option value="hard">صعب (بيحسب الورق والخمسات)</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>الهدف (السكور):</label>
                 <select id="off-score">
                     <option value="50">50 نقطة</option>
                     <option value="100">100 نقطة</option>
+                    <option value="150">150 نقطة</option>
                 </select>
             </div>
             <button onclick="startOfflineGame()">🚀 ابدأ اللعب</button>
@@ -172,11 +204,11 @@
 
     <div id="game-screen" class="hidden">
         <div class="game-header">
-            <button onclick="exitToMenu()" style="background-color: #f44336; margin: 0;">🚪 خروج للرئيسية</button>
+            <button onclick="exitToMenu()" style="background-color: #f44336; margin: 0;">🚪 خروج</button>
             <div class="scoreboard">
-                <span class="score-item">سكورك أنت: <span id="ui-player-score">0</span></span>
+                <span class="score-item">سكورك: <span id="ui-player-score">0</span></span>
                 <span style="color: #fff;">الهدف: <span id="ui-target-score">50</span></span>
-                <span class="score-bot">سكور البوت: <span id="ui-bot-score">0</span></span>
+                <span class="score-bot">البوت: <span id="ui-bot-score">0</span></span>
             </div>
         </div>
 
@@ -192,6 +224,7 @@
 
         <div class="action-panel">
             <span>📭 الورق في البلاطة: <span id="deck-count" style="color: #ffeb3b; font-size: 18px;">0</span></span>
+            <span id="mode-badge" style="margin-right: 15px; background: #2196f3; padding: 2px 10px; border-radius: 5px;">عادي</span>
         </div>
 
         <div class="player-hand" id="my-hand"></div>
@@ -231,12 +264,13 @@
 
         let deck = [], playersHands = [];
         let leftEnd = null, rightEnd = null;
+        let leftEndIsDouble = false, rightEndIsDouble = false;
         let currentTurn = 0; 
         let tableBones = []; 
         
-        let playerScore = 0;
-        let botScore = 0;
-        let targetScore = 50;
+        let playerScore = 0, botScore = 0, targetScore = 50;
+        let gameMode = 'normal'; // 'normal' أو 'amricani'
+        let botLevel = 'easy';   // 'easy', 'medium', 'hard'
         let gameActive = false;
 
         function saveGame() {
@@ -244,6 +278,7 @@
             const gameState = {
                 deck, playersHands, leftEnd, rightEnd, currentTurn,
                 playerScore, botScore, targetScore, tableBones,
+                leftEndIsDouble, rightEndIsDouble, gameMode, botLevel,
                 gameActive: true
             };
             localStorage.setItem('domino_spygame_save', JSON.stringify(gameState));
@@ -287,6 +322,7 @@
             document.getElementById('ui-player-score').innerText = playerScore;
             document.getElementById('ui-bot-score').innerText = botScore;
             document.getElementById('ui-target-score').innerText = targetScore;
+            document.getElementById('mode-badge').innerText = (gameMode === 'amricani') ? 'أمريكاني 🇺🇸' : 'عادي 🇪🇬';
         }
 
         function renderBotHand() {
@@ -303,10 +339,7 @@
 
         function createDominoHTML(n1, n2) {
             function getHalf(num) {
-                const patterns = {
-                    0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 
-                    4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
-                };
+                const patterns = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
                 let html = '<div class="half">';
                 for(let i = 0; i < 9; i++) {
                     html += patterns[num].includes(i) ? '<div class="dot"></div>' : '<div></div>';
@@ -329,7 +362,6 @@
                     let isPlayable = false;
                     if (leftEnd === null && rightEnd === null) isPlayable = true;
                     else if (bone[0] === leftEnd || bone[1] === leftEnd || bone[0] === rightEnd || bone[1] === rightEnd) isPlayable = true;
-
                     if (isPlayable) boneEl.classList.add('playable-glow');
                 }
 
@@ -344,14 +376,53 @@
             return hand.some(bone => bone[0] === leftEnd || bone[1] === leftEnd || bone[0] === rightEnd || bone[1] === rightEnd);
         }
 
+        function showPointsPopup(points, who) {
+            let popup = document.createElement('div');
+            popup.className = 'points-popup';
+            popup.innerText = `+${points}`;
+            let board = document.getElementById('board');
+            
+            if (who === 'player') {
+                popup.style.bottom = '20px'; popup.style.left = '50%';
+            } else {
+                popup.style.top = '20px'; popup.style.left = '50%';
+            }
+            
+            board.appendChild(popup);
+            setTimeout(() => popup.remove(), 1500);
+        }
+
+        // دالة بتحسب النقط للأمريكاني قبل اللعب الفعلي (عشان البوت يقيمها) وللعب الفعلي
+        function calculateAmricaniScore(bone, playAt, flip) {
+            let newLeftEnd = leftEnd; let newRightEnd = rightEnd;
+            let newLeftIsDouble = leftEndIsDouble; let newRightIsDouble = rightEndIsDouble;
+            
+            if (leftEnd === null) {
+                let sum = bone[0] + bone[1];
+                return (sum % 5 === 0) ? sum : 0;
+            }
+            
+            if (playAt === 'right') {
+                newRightEnd = flip ? bone[0] : bone[1];
+                newRightIsDouble = (bone[0] === bone[1]);
+            } else {
+                newLeftEnd = flip ? bone[1] : bone[0];
+                newLeftIsDouble = (bone[0] === bone[1]);
+            }
+            
+            let sum = 0;
+            sum += newLeftIsDouble ? newLeftEnd * 2 : newLeftEnd;
+            sum += newRightIsDouble ? newRightEnd * 2 : newRightEnd;
+            
+            return (sum % 5 === 0) ? sum : 0;
+        }
+
         function addDominoToBoardDOM(bone, side, flip, isBot = false, isLoading = false) {
             const board = document.getElementById('board');
             const emptyMsg = document.getElementById('empty-msg');
             if(emptyMsg) emptyMsg.remove();
 
-            if (!isLoading) {
-                tableBones.push({ bone, side, flip, isBot });
-            }
+            if (!isLoading) tableBones.push({ bone, side, flip, isBot });
 
             const isDouble = bone[0] === bone[1];
             const boneEl = document.createElement('div');
@@ -368,14 +439,10 @@
             }
             
             boneEl.innerHTML = htmlStr;
-            
             if (side === 'left') board.prepend(boneEl);
             else board.appendChild(boneEl);
 
-            setTimeout(() => {
-                boneEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }, 50);
-
+            setTimeout(() => { boneEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 50);
             if (!isLoading) saveGame();
         }
 
@@ -387,37 +454,23 @@
             let pHand = playersHands[0];
             let bHand = playersHands[1];
 
-            if (pHand.length === 0) {
-                let points = calculateHandScore(bHand);
-                playerScore += points;
-                clearSave(); 
-                endRoundAlert(`عاش! أنت خلصت ورقك وكسبت الجولة. خدت ${points} نقطة من البوت.`, playerScore, botScore);
-                return true;
-            }
-            if (bHand.length === 0) {
-                let points = calculateHandScore(pHand);
-                botScore += points;
-                clearSave();
-                endRoundAlert(`البوت خلص ورقه الأول! البوت خد ${points} نقطة.`, playerScore, botScore);
-                return true;
-            }
-
-            let pCanMove = hasValidMove(pHand);
-            let bCanMove = hasValidMove(bHand);
-            if (!pCanMove && !bCanMove && deck.length === 0) {
+            if (pHand.length === 0 || bHand.length === 0 || (!hasValidMove(pHand) && !hasValidMove(bHand) && deck.length === 0)) {
                 let pScore = calculateHandScore(pHand);
                 let bScore = calculateHandScore(bHand);
                 clearSave();
-                
+
+                let msg = "";
                 if (pScore < bScore) {
-                    playerScore += bScore;
-                    endRoundAlert(`قفلة! ورقك أخف من البوت (${pScore} ضد ${bScore}). أنت كسبت وخدت ${bScore} نقطة.`, playerScore, botScore);
+                    playerScore += bScore; // الفايز بياخد نقط الخسران
+                    msg = `عاش! أنت كسبت الجولة وخدت ${bScore} نقطة من البوت.`;
                 } else if (bScore < pScore) {
                     botScore += pScore;
-                    endRoundAlert(`قفلة! ورق البوت أخف منك (${bScore} ضد ${pScore}). البوت كسب وخد ${pScore} نقطة.`, playerScore, botScore);
+                    msg = `البوت كسب الجولة دي وخد ${pScore} نقطة.`;
                 } else {
-                    endRoundAlert(`قفلة! تعادل في الورق (${pScore}). مفيش حد هياخد نقط الجولة دي.`, playerScore, botScore);
+                    msg = `قفلة! تعادل في الورق (${pScore}). مفيش حد هياخد نقط.`;
                 }
+                
+                endRoundAlert(msg, playerScore, botScore);
                 return true;
             }
             return false;
@@ -430,20 +483,20 @@
                 
                 if (playerScore >= targetScore) {
                     alert("🎉 مبروووك! أنت كسبت الجيم كله!");
-                    clearSave();
-                    showScreen('main-menu');
+                    clearSave(); showScreen('main-menu');
                 } else if (botScore >= targetScore) {
                     alert("💀 البوت كسب الجيم ده! هارد لك، جرب تاني.");
-                    clearSave();
-                    showScreen('main-menu');
+                    clearSave(); showScreen('main-menu');
                 } else {
                     startNewRound(); 
                 }
-            }, 500);
+            }, 600);
         }
 
         function startOfflineGame() {
             targetScore = parseInt(document.getElementById('off-score').value);
+            gameMode = document.getElementById('off-game-mode').value;
+            botLevel = document.getElementById('off-bot-level').value;
             playerScore = 0; botScore = 0;
             gameActive = true;
             startNewRound();
@@ -454,6 +507,7 @@
             gameActive = true;
             document.getElementById('board').innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>';
             leftEnd = null; rightEnd = null;
+            leftEndIsDouble = false; rightEndIsDouble = false;
             tableBones = []; 
             generateDeck();
             shuffleDeck();
@@ -475,11 +529,8 @@
                     
                     let autoDraw = setInterval(() => {
                         if (deck.length > 0 && !hasValidMove(playersHands[0])) {
-                            let drawnBone = deck.pop();
-                            playersHands[0].push(drawnBone);
-                            updateDeckCountUI();
-                            renderHand(0);
-                            saveGame();
+                            playersHands[0].push(deck.pop());
+                            updateDeckCountUI(); renderHand(0); saveGame();
                         } else {
                             clearInterval(autoDraw);
                             if (hasValidMove(playersHands[0])) {
@@ -509,43 +560,120 @@
             setTimeout(botPlay, 1000);
         }
 
-        function playBone(playerIndex, boneIndex) {
+        // --- دالة اللعب المركزية ---
+        function playBone(playerIndex, boneIndex, forcePlayAt = null, forceFlip = null) {
             if (currentTurn !== playerIndex) return; 
 
             let bone = playersHands[playerIndex][boneIndex];
-            let playAt = null, flip = false;
+            let playAt = forcePlayAt;
+            let flip = forceFlip;
 
-            if (leftEnd === null && rightEnd === null) playAt = 'right';
-            else if (bone[0] === rightEnd) { playAt = 'right'; flip = false; }
-            else if (bone[1] === rightEnd) { playAt = 'right'; flip = true; }
-            else if (bone[0] === leftEnd) { playAt = 'left'; flip = true; }
-            else if (bone[1] === leftEnd) { playAt = 'left'; flip = false; }
-            else {
-                alert('الورقة دي ماتركبش! العب من الورق اللي منور أخضر بس.');
-                return;
+            // لو اليوزر اللي بيلعب مش البوت
+            if (playAt === null) {
+                if (leftEnd === null && rightEnd === null) playAt = 'right';
+                else if (bone[0] === rightEnd) { playAt = 'right'; flip = false; }
+                else if (bone[1] === rightEnd) { playAt = 'right'; flip = true; }
+                else if (bone[0] === leftEnd) { playAt = 'left'; flip = true; }
+                else if (bone[1] === leftEnd) { playAt = 'left'; flip = false; }
+                else { alert('الورقة دي ماتركبش! العب من الورق اللي منور أخضر بس.'); return; }
             }
 
+            // حساب الخمسات (الأمريكاني)
+            if (gameMode === 'amricani') {
+                let points = calculateAmricaniScore(bone, playAt, flip);
+                if (points > 0) {
+                    if (playerIndex === 0) { playerScore += points; showPointsPopup(points, 'player'); }
+                    else { botScore += points; showPointsPopup(points, 'bot'); }
+                    updateDeckCountUI();
+                }
+            }
+
+            // سحب الورقة وتحديث الأطراف
             playersHands[playerIndex].splice(boneIndex, 1);
-            if (leftEnd === null && rightEnd === null) { leftEnd = bone[0]; rightEnd = bone[1]; }
-            else if (playAt === 'right') rightEnd = flip ? bone[0] : bone[1];
-            else if (playAt === 'left') leftEnd = flip ? bone[1] : bone[0];
+            if (leftEnd === null && rightEnd === null) { 
+                leftEnd = bone[0]; rightEnd = bone[1]; 
+                leftEndIsDouble = rightEndIsDouble = (bone[0] === bone[1]);
+            } else if (playAt === 'right') { 
+                rightEnd = flip ? bone[0] : bone[1]; 
+                rightEndIsDouble = (bone[0] === bone[1]);
+            } else if (playAt === 'left') { 
+                leftEnd = flip ? bone[1] : bone[0]; 
+                leftEndIsDouble = (bone[0] === bone[1]);
+            }
 
             addDominoToBoardDOM(bone, playAt, flip, playerIndex !== 0);
             
-            if (playerIndex === 0) renderHand(0); 
-            else renderBotHand();
+            if (playerIndex === 0) renderHand(0); else renderBotHand();
 
             if (checkRoundEnd()) return;
 
+            // نقل الدور
             if (playerIndex === 0) {
                 currentTurn = 1;
                 document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
                 document.getElementById('game-info').style.color = `#ff4444`;
-                renderHand(0); 
-                saveGame();
+                renderHand(0); saveGame();
                 setTimeout(botPlay, 1200);
             } else {
                 setTimeout(playerTurnInit, 500); 
+            }
+        }
+
+        // --- العقل المدبر للبوت بمستوياته ---
+        function executeBotMove() {
+            let hand = playersHands[1];
+            let validMoves = [];
+            
+            // 1. تجميع كل الحركات المتاحة
+            for (let i = 0; i < hand.length; i++) {
+                let b = hand[i];
+                if (leftEnd === null && rightEnd === null) {
+                    validMoves.push({ index: i, bone: b, playAt: 'right', flip: false });
+                } else {
+                    if (b[0] === rightEnd) validMoves.push({ index: i, bone: b, playAt: 'right', flip: false });
+                    if (b[1] === rightEnd) validMoves.push({ index: i, bone: b, playAt: 'right', flip: true });
+                    // عشان لو الدومينو تركب يمين وشمال نقيم الناحيتين
+                    if (b[0] === leftEnd) validMoves.push({ index: i, bone: b, playAt: 'left', flip: true });
+                    if (b[1] === leftEnd) validMoves.push({ index: i, bone: b, playAt: 'left', flip: false });
+                }
+            }
+
+            // 2. الفلترة حسب الصعوبة
+            if (botLevel === 'easy') {
+                // بيختار حركة عشوائية
+                let randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                playBone(1, randomMove.index, randomMove.playAt, randomMove.flip);
+                
+            } else if (botLevel === 'medium') {
+                // بيرمي الورق اللي مجموعه كبير عشان يخلص منه
+                validMoves.sort((a, b) => (b.bone[0] + b.bone[1]) - (a.bone[0] + a.bone[1]));
+                let best = validMoves[0];
+                playBone(1, best.index, best.playAt, best.flip);
+
+            } else if (botLevel === 'hard') {
+                if (gameMode === 'amricani') {
+                    // في الأمريكاني بيدور على النقط الأول، ولو مفيش يرمي الورق التقيل
+                    validMoves.forEach(m => {
+                        m.points = calculateAmricaniScore(m.bone, m.playAt, m.flip);
+                        m.weight = m.bone[0] + m.bone[1];
+                    });
+                    validMoves.sort((a, b) => {
+                        if (b.points !== a.points) return b.points - a.points; // الأولوية للنقط
+                        return b.weight - a.weight; // ثم الوزن
+                    });
+                } else {
+                    // في العادي بيفضل رمي الدشوش ثم الورق التقيل
+                    validMoves.forEach(m => {
+                        m.weight = m.bone[0] + m.bone[1];
+                        m.isDouble = (m.bone[0] === m.bone[1]) ? 1 : 0;
+                    });
+                    validMoves.sort((a, b) => {
+                        if (a.isDouble !== b.isDouble) return b.isDouble - a.isDouble;
+                        return b.weight - a.weight;
+                    });
+                }
+                let best = validMoves[0];
+                playBone(1, best.index, best.playAt, best.flip);
             }
         }
 
@@ -561,9 +689,7 @@
                 let drawInterval = setInterval(() => {
                     if (deck.length > 0 && !hasValidMove(hand)) {
                         hand.push(deck.pop());
-                        updateDeckCountUI();
-                        renderBotHand();
-                        saveGame();
+                        updateDeckCountUI(); renderBotHand(); saveGame();
                     } else {
                         clearInterval(drawInterval);
                         if (hasValidMove(hand)) executeBotMove();
@@ -575,74 +701,50 @@
             }
         }
 
-        function executeBotMove() {
-            let hand = playersHands[1];
-            for (let i = 0; i < hand.length; i++) {
-                let bone = hand[i];
-                if (leftEnd === null || bone[0] === rightEnd || bone[1] === rightEnd || bone[0] === leftEnd || bone[1] === leftEnd) {
-                    playBone(1, i);
-                    return; 
-                }
-            }
-        }
-
         function botPass() {
             if (checkRoundEnd()) return; 
             alert("البوت باصى الدور عشان معهوش لعب والبلاطة فاضية! 🛑");
             playerTurnInit(); 
         }
 
-        // --- الماكينة اللي بتشتغل أول ما الصفحة تفتح فوراً ---
+        // --- الماكينة اللي بتشتغل أول ما الصفحة تفتح ---
         function checkSavedGame() {
             const savedData = localStorage.getItem('domino_spygame_save');
             if (savedData) {
                 const state = JSON.parse(savedData);
                 if (state.gameActive) {
-                    // استرجاع المتغيرات
-                    deck = state.deck;
-                    playersHands = state.playersHands;
-                    leftEnd = state.leftEnd;
-                    rightEnd = state.rightEnd;
-                    currentTurn = state.currentTurn;
-                    playerScore = state.playerScore;
-                    botScore = state.botScore;
-                    targetScore = state.targetScore;
-                    tableBones = state.tableBones;
-                    gameActive = true;
+                    deck = state.deck; playersHands = state.playersHands;
+                    leftEnd = state.leftEnd; rightEnd = state.rightEnd;
+                    leftEndIsDouble = state.leftEndIsDouble || false;
+                    rightEndIsDouble = state.rightEndIsDouble || false;
+                    gameMode = state.gameMode || 'normal';
+                    botLevel = state.botLevel || 'easy';
+                    currentTurn = state.currentTurn; playerScore = state.playerScore;
+                    botScore = state.botScore; targetScore = state.targetScore;
+                    tableBones = state.tableBones; gameActive = true;
 
-                    // تحديث الواجهة فوراً
-                    updateDeckCountUI();
-                    renderBotHand();
-                    showScreen('game-screen');
+                    updateDeckCountUI(); renderBotHand(); showScreen('game-screen');
 
-                    // إعادة بناء الطاولة
                     const board = document.getElementById('board');
                     board.innerHTML = '';
                     if (tableBones.length === 0) {
                         board.innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>';
                     } else {
-                        tableBones.forEach(item => {
-                            addDominoToBoardDOM(item.bone, item.side, item.flip, item.isBot, true);
-                        });
+                        tableBones.forEach(item => { addDominoToBoardDOM(item.bone, item.side, item.flip, item.isBot, true); });
                     }
 
-                    // استكمال الدور
-                    if (currentTurn === 0) {
-                        playerTurnInit();
-                    } else {
+                    if (currentTurn === 0) playerTurnInit();
+                    else {
                         document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
                         document.getElementById('game-info').style.color = `#ff4444`;
-                        renderHand(0);
-                        setTimeout(botPlay, 1000);
+                        renderHand(0); setTimeout(botPlay, 1000);
                     }
-                    return; // لو لقى جيم، بيخرج من الدالة وميظهرش القائمة
+                    return; 
                 }
             }
-            // لو مفيش جيم محفوظ، هيظهر القائمة الرئيسية
             showScreen('main-menu');
         }
 
-        // الاستدعاء المباشر للدالة عشان تشتغل أول حاجة وتمنع القائمة من الظهور
         checkSavedGame();
     </script>
 </body>
