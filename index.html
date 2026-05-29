@@ -53,25 +53,25 @@
             flex: 1;
             background-color: var(--board-bg);
             border-radius: 15px;
-            margin: 20px;
+            margin: 10px 20px;
             position: relative;
             display: flex;
-            justify-content: center;
+            justify-content: center; 
             align-items: center;
-            flex-wrap: wrap;
-            align-content: center;
+            flex-wrap: nowrap; 
+            overflow-x: auto; 
             border: 10px solid #5c4033;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
             padding: 20px;
         }
 
-        .player-hand { display: flex; justify-content: center; gap: 10px; padding: 15px; background-color: var(--panel-bg); flex-wrap: wrap; }
+        .player-hand { display: flex; justify-content: center; gap: 10px; padding: 15px; background-color: var(--panel-bg); flex-wrap: wrap; min-height: 140px; align-items: center; }
 
         /* -------------- تصميم الدومنة الحقيقي -------------- */
         .domino {
             width: 50px;
             height: 100px;
-            background-color: #fdf5e6; /* لون العاج */
+            background-color: #fdf5e6; 
             border-radius: 8px;
             display: flex;
             flex-direction: column;
@@ -79,10 +79,20 @@
             box-shadow: 3px 3px 6px rgba(0,0,0,0.6), inset 0 0 5px rgba(0,0,0,0.1);
             cursor: pointer;
             padding: 4px;
-            transition: transform 0.2s;
+            transition: all 0.2s ease-in-out;
+            flex-shrink: 0;
+        }
+
+        /* كلاس الإضاءة للورق اللي ينفع يتلعب */
+        .playable-glow {
+            box-shadow: 0 0 15px #00ff88, inset 0 0 5px rgba(0, 255, 136, 0.3) !important;
+            border: 2px solid #00ff88 !important;
+            transform: translateY(-8px); /* بيرفع الورقة لفوق شوية عشان تبان */
         }
         
-        .domino:hover { transform: translateY(-10px); }
+        .domino-horizontal { width: 100px; height: 50px; flex-direction: row; }
+
+        .player-hand .domino:hover { transform: translateY(-12px); }
 
         .domino .half {
             flex: 1;
@@ -93,28 +103,15 @@
             justify-items: center;
         }
 
-        .domino .divider {
-            height: 2px;
-            background-color: #222;
-            width: 100%;
-            margin: 2px 0;
-            box-shadow: 0 1px 0 rgba(255,255,255,0.8);
-        }
+        .domino .divider { height: 2px; background-color: #222; width: 100%; margin: 2px 0; box-shadow: 0 1px 0 rgba(255,255,255,0.8); }
+        .domino-horizontal .divider { width: 2px; height: 100%; margin: 0 2px; }
 
-        .dot {
-            width: 10px;
-            height: 10px;
-            background-color: #111;
-            border-radius: 50%;
-            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.4);
-        }
+        .dot { width: 10px; height: 10px; background-color: #111; border-radius: 50%; box-shadow: inset 1px 1px 2px rgba(255,255,255,0.4); }
 
-        /* تعديل حجم الدومنة وهي على الطاولة (عشان لو لفت) */
-        .board-domino {
-            margin: 5px;
-            cursor: default;
-        }
+        .board-domino { margin: 1px; cursor: default; }
         .board-domino:hover { transform: none; }
+
+        .action-panel { display: flex; justify-content: center; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 5px; }
 
         .hidden { display: none !important; }
     </style>
@@ -156,42 +153,23 @@
                     <option value="100">100 نقطة</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label>مستوى البوت:</label>
-                <select id="off-bot-level">
-                    <option value="easy">سهل (بيلعب عشوائي)</option>
-                    <option value="medium">متوسط</option>
-                    <option value="hard">صعب (بيحسب الورق)</option>
-                </select>
-            </div>
             <button onclick="startOfflineGame()">🚀 ابدأ اللعب</button>
-            <button onclick="showScreen('main-menu')" style="background-color: #555;">رجوع</button>
-        </div>
-    </div>
-
-    <div class="container hidden" id="online-setup">
-        <div class="menu-card">
-            <h2>لعب أونلاين</h2>
-            <div class="form-group">
-                <label>رقم الغرفة (عشان تنضم):</label>
-                <input type="text" id="room-code" placeholder="مثال: ROOM-123">
-            </div>
-            <button onclick="joinRoom()">🔗 انضم للغرفة</button>
-            <hr style="margin: 20px 0; border-color: rgba(255,255,255,0.1);">
-            <h3>أو</h3>
-            <button onclick="createRoom()">➕ أنشئ غرفة جديدة</button>
-            <br><br>
             <button onclick="showScreen('main-menu')" style="background-color: #555;">رجوع</button>
         </div>
     </div>
 
     <div id="game-screen">
         <div style="text-align: center; padding: 10px;">
-            <h3 id="game-info">الغرفة: أوفلاين | الهدف: 50 | دورك</h3>
+            <h3 id="game-info">الدور: دورك أنت</h3>
         </div>
         
         <div class="game-board" id="board">
-            <p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center;">الطاولة فاضية، ابدأ اللعب</p>
+            <p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>
+        </div>
+
+        <div class="action-panel">
+            <button id="draw-btn" onclick="playerDraw()">📭 اسحب من البلاطة (<span id="deck-count">0</span>)</button>
+            <button id="pass-btn" class="hidden" onclick="playerPass()" style="background-color: #f44336;">باص الدور 🛑</button>
         </div>
 
         <div class="player-hand" id="my-hand"></div>
@@ -219,7 +197,11 @@
             if(screenId === 'game-screen') document.getElementById('game-screen').style.display = 'flex';
         }
 
-        let deck = [], playersHands = [], tableBones = [];
+        let deck = [], playersHands = [];
+        let leftEnd = null;
+        let rightEnd = null;
+        let currentTurn = 0; 
+        let currentMode = '';
 
         function generateDeck() {
             deck = [];
@@ -244,28 +226,22 @@
                     playersHands[p].push(deck.pop());
                 }
             }
+            updateDeckCountUI();
         }
 
-        // --- دالة رسم النقط (الـ Dots) بناءً على الرقم ---
+        function updateDeckCountUI() {
+            document.getElementById('deck-count').innerText = deck.length;
+        }
+
         function createDominoHTML(n1, n2) {
             function getHalf(num) {
-                // مواقع النقط في شبكة 3x3 (أرقام المربعات من 0 لـ 8)
                 const patterns = {
-                    0: [],
-                    1: [4],
-                    2: [0, 8],
-                    3: [0, 4, 8],
-                    4: [0, 2, 6, 8],
-                    5: [0, 2, 4, 6, 8],
-                    6: [0, 2, 3, 5, 6, 8]
+                    0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 
+                    4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
                 };
                 let html = '<div class="half">';
                 for(let i = 0; i < 9; i++) {
-                    if(patterns[num].includes(i)) {
-                        html += '<div class="dot"></div>';
-                    } else {
-                        html += '<div></div>'; // مربع فاضي عشان يحافظ على أبعاد الشبكة
-                    }
+                    html += patterns[num].includes(i) ? '<div class="dot"></div>' : '<div></div>';
                 }
                 html += '</div>';
                 return html;
@@ -273,52 +249,158 @@
             return getHalf(n1) + '<div class="divider"></div>' + getHalf(n2);
         }
 
+        // --- التعديل هنا لتمييز الورق اللي ينفع يتلعب ---
         function renderHand(handIndex) {
             const handDiv = document.getElementById('my-hand');
             handDiv.innerHTML = ''; 
-
+            
             playersHands[handIndex].forEach((bone, index) => {
                 const boneEl = document.createElement('div');
                 boneEl.className = 'domino';
+
+                // فحص إذا كانت الورقة قابلة للعب (للاعب الأساسي بس)
+                if (handIndex === 0 && currentTurn === 0) {
+                    let isPlayable = false;
+                    if (leftEnd === null && rightEnd === null) {
+                        isPlayable = true; // أول دور كل الورق ينفع
+                    } else if (bone[0] === leftEnd || bone[1] === leftEnd || bone[0] === rightEnd || bone[1] === rightEnd) {
+                        isPlayable = true; // الورقة دي بتركب على طرف من الأطراف
+                    }
+
+                    if (isPlayable) {
+                        boneEl.classList.add('playable-glow');
+                    }
+                }
+
                 boneEl.innerHTML = createDominoHTML(bone[0], bone[1]);
                 boneEl.onclick = () => playBone(handIndex, index);
                 handDiv.appendChild(boneEl);
             });
+            checkPlayerPossibilities();
         }
 
-        function playBone(playerIndex, boneIndex) {
-            let playedBone = playersHands[playerIndex].splice(boneIndex, 1)[0];
-            tableBones.push(playedBone);
-            renderHand(playerIndex);
-            
-            const board = document.getElementById('board');
-            const emptyMsg = document.getElementById('empty-msg');
-            if(emptyMsg) emptyMsg.remove();
-            
-            const boneEl = document.createElement('div');
-            boneEl.className = 'domino board-domino';
-            
-            // عشان ندي شكل واقعي شوية على الطاولة ممكن نخلي الورق يلف
-            // بس للتبسيط دلوقتي هنرصه جنب بعضه
-            boneEl.innerHTML = createDominoHTML(playedBone[0], playedBone[1]);
-            board.appendChild(boneEl);
+        function hasValidMove(hand) {
+            if (leftEnd === null && rightEnd === null) return true; 
+            return hand.some(bone => bone[0] === leftEnd || bone[1] === leftEnd || bone[0] === rightEnd || bone[1] === rightEnd);
+        }
 
-            if(currentMode === 'offline') {
-                setTimeout(botPlay, 1000);
+        function checkPlayerPossibilities() {
+            if (currentTurn !== 0) {
+                document.getElementById('pass-btn').classList.add('hidden');
+                return;
+            }
+            
+            if (!hasValidMove(playersHands[0]) && deck.length === 0) {
+                document.getElementById('pass-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('pass-btn').classList.add('hidden');
             }
         }
 
-        let currentMode = '';
+        function addDominoToBoardDOM(bone, side, flip, isBot = false) {
+            const board = document.getElementById('board');
+            const emptyMsg = document.getElementById('empty-msg');
+            if(emptyMsg) emptyMsg.remove();
+
+            const isDouble = bone[0] === bone[1];
+            const boneEl = document.createElement('div');
+            boneEl.className = 'domino board-domino';
+            if (isBot) boneEl.style.boxShadow = "0 0 10px rgba(255, 68, 68, 0.8)"; 
+            
+            let htmlStr = '';
+            if (isDouble) {
+                htmlStr = createDominoHTML(bone[0], bone[1]);
+            } else {
+                boneEl.classList.add('domino-horizontal');
+                htmlStr = flip ? createDominoHTML(bone[1], bone[0]) : createDominoHTML(bone[0], bone[1]);
+            }
+            
+            boneEl.innerHTML = htmlStr;
+            if (side === 'left') board.prepend(boneEl);
+            else board.appendChild(boneEl);
+        }
+
+        function playBone(playerIndex, boneIndex) {
+            if (currentTurn !== playerIndex) return; 
+
+            let bone = playersHands[playerIndex][boneIndex];
+            let playAt = null;
+            let flip = false;
+
+            if (leftEnd === null && rightEnd === null) {
+                playAt = 'right';
+            } else if (bone[0] === rightEnd) {
+                playAt = 'right'; flip = false;
+            } else if (bone[1] === rightEnd) {
+                playAt = 'right'; flip = true;
+            } else if (bone[0] === leftEnd) {
+                playAt = 'left'; flip = true;
+            } else if (bone[1] === leftEnd) {
+                playAt = 'left'; flip = false;
+            } else {
+                alert('الورقة دي ماتركبش على الطاولة! شوف ورقة من اللي منورين.');
+                return;
+            }
+
+            playersHands[playerIndex].splice(boneIndex, 1);
+            
+            if (leftEnd === null && rightEnd === null) {
+                leftEnd = bone[0]; rightEnd = bone[1];
+            } else if (playAt === 'right') {
+                rightEnd = flip ? bone[0] : bone[1];
+            } else if (playAt === 'left') {
+                leftEnd = flip ? bone[1] : bone[0];
+            }
+
+            addDominoToBoardDOM(bone, playAt, flip, playerIndex !== 0);
+            renderHand(playerIndex); // تحديث الإيد (هيشيل النور من الورق اللي كان منور لو الدور خلص)
+
+            if(currentMode === 'offline') {
+                currentTurn = 1;
+                document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
+                renderHand(0); // تحديث إيد اللاعب عشان نقفل النور وقت لعب البوت
+                setTimeout(botPlay, 1500);
+            }
+        }
+
+        function playerDraw() {
+            if (currentTurn !== 0) return alert("مش دورك تسحب دلوقتي!");
+            if (hasValidMove(playersHands[0])) return alert("معاك ورق ينفع يتلعب! العب الأول.");
+            
+            if (deck.length > 0) {
+                let drawnBone = deck.pop();
+                playersHands[0].push(drawnBone);
+                updateDeckCountUI();
+                renderHand(0);
+                
+                if (hasValidMove([drawnBone])) {
+                    alert("طلعتلك ورقة تنفع! العبها دلوقتي.");
+                }
+            } else {
+                alert("البلاطة فضيت خلاص! اضغط على باص الدور.");
+            }
+        }
+
+        function playerPass() {
+            if (currentTurn !== 0) return;
+            currentTurn = 1;
+            document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
+            document.getElementById('pass-btn').classList.add('hidden');
+            renderHand(0);
+            setTimeout(botPlay, 1500);
+        }
+
         function startOfflineGame() {
             currentMode = 'offline';
+            currentTurn = 0; 
             const numPlayers = parseInt(document.getElementById('off-players').value);
             const targetScore = document.getElementById('off-score').value;
-            const botLevel = document.getElementById('off-bot-level').value;
 
-            document.getElementById('game-info').innerText = `أوفلاين | لاعبين: ${numPlayers} | الهدف: ${targetScore} | مستوى البوت: ${botLevel}`;
+            document.getElementById('game-info').innerText = `الدور: دورك أنت`;
+            document.getElementById('board').innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>';
             
-            document.getElementById('board').innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center;">الطاولة فاضية، ابدأ اللعب</p>';
-            tableBones = [];
+            leftEnd = null;
+            rightEnd = null;
             generateDeck();
             shuffleDeck();
             dealCards(numPlayers);
@@ -327,44 +409,53 @@
         }
 
         function botPlay() {
-            if(playersHands[1] && playersHands[1].length > 0) {
-                let botBone = playersHands[1].splice(0, 1)[0];
-                tableBones.push(botBone);
-                
-                const board = document.getElementById('board');
-                const emptyMsg = document.getElementById('empty-msg');
-                if(emptyMsg) emptyMsg.remove();
+            let hand = playersHands[1];
+            if(!hand) return;
 
-                const boneEl = document.createElement('div');
-                boneEl.className = 'domino board-domino';
-                // تلوين خفيف لورق البوت عشان تميزه على الطاولة
-                boneEl.style.boxShadow = "0 0 10px rgba(255, 0, 0, 0.5)"; 
-                boneEl.innerHTML = createDominoHTML(botBone[0], botBone[1]);
-                board.appendChild(boneEl);
+            if (hasValidMove(hand)) {
+                executeBotMove();
+            } 
+            else if (deck.length > 0) {
+                document.getElementById('game-info').innerText = `البوت بيسحب من البلاطة... 📭`;
+                
+                let drawInterval = setInterval(() => {
+                    if (deck.length > 0 && !hasValidMove(hand)) {
+                        let drawn = deck.pop();
+                        hand.push(drawn);
+                        updateDeckCountUI();
+                    } else {
+                        clearInterval(drawInterval);
+                        if (hasValidMove(hand)) {
+                            executeBotMove();
+                        } else {
+                            botPass();
+                        }
+                    }
+                }, 1000);
+            } else {
+                botPass();
             }
         }
 
-        function createRoom() {
-            const roomId = 'ROOM-' + Math.floor(Math.random() * 10000);
-            db.ref('rooms/' + roomId).set({ status: 'waiting', players: 1, board: [], turn: 0 })
-            .then(() => {
-                alert('تم إنشاء الغرفة! رقم الغرفة: ' + roomId);
-                document.getElementById('game-info').innerText = `أونلاين | الغرفة: ${roomId} | في انتظار اللاعبين...`;
-                showScreen('game-screen');
-            }).catch(error => alert('حصل مشكلة: ' + error.message));
+        function executeBotMove() {
+            let hand = playersHands[1];
+            for (let i = 0; i < hand.length; i++) {
+                let bone = hand[i];
+                if (leftEnd === null || bone[0] === rightEnd || bone[1] === rightEnd || bone[0] === leftEnd || bone[1] === leftEnd) {
+                    playBone(1, i);
+                    currentTurn = 0;
+                    document.getElementById('game-info').innerText = `الدور: دورك أنت`;
+                    renderHand(0); // تحديث الإضاءة عشان دورك رجع
+                    break;
+                }
+            }
         }
 
-        function joinRoom() {
-            const roomId = document.getElementById('room-code').value.trim();
-            if(!roomId) return alert('اكتب رقم الغرفة الأول!');
-
-            db.ref('rooms/' + roomId).once('value').then(snapshot => {
-                if(snapshot.exists()) {
-                    db.ref('rooms/' + roomId).update({ players: snapshot.val().players + 1 });
-                    document.getElementById('game-info').innerText = `أونلاين | الغرفة: ${roomId} | متصل`;
-                    showScreen('game-screen');
-                } else alert('الغرفة مش موجودة!');
-            });
+        function botPass() {
+            alert("البوت معهوش لعب وباصى الدور! 🛑");
+            currentTurn = 0;
+            document.getElementById('game-info').innerText = `الدور: دورك أنت`;
+            renderHand(0); 
         }
     </script>
 </body>
