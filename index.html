@@ -49,13 +49,15 @@
 
         #game-screen { display: none; flex-direction: column; height: 100%; width: 100%; }
         
-        /* لوحة السكور */
+        .game-header { display: flex; justify-content: space-between; align-items: center; margin: 10px 20px 0; }
+
         .scoreboard {
+            flex: 1;
             display: flex;
             justify-content: space-around;
             background-color: var(--panel-bg);
             padding: 10px;
-            margin: 10px 20px 0;
+            margin-right: 15px;
             border-radius: 10px;
             font-size: 18px;
             font-weight: bold;
@@ -64,6 +66,18 @@
         }
         .score-item { color: #00ff88; }
         .score-bot { color: #ff4444; }
+
+        .bot-hand { display: flex; justify-content: center; gap: 5px; margin-top: 15px; min-height: 70px; }
+
+        .bot-domino-back {
+            width: 35px;
+            height: 70px;
+            background: linear-gradient(135deg, #16213e 25%, #1a1a2e 25%, #1a1a2e 50%, #16213e 50%, #16213e 75%, #1a1a2e 75%, #1a1a2e 100%);
+            background-size: 10px 10px;
+            border-radius: 5px;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
 
         .game-board {
             flex: 1;
@@ -79,6 +93,7 @@
             border: 10px solid #5c4033;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
             padding: 20px;
+            scroll-behavior: smooth;
         }
 
         .player-hand { display: flex; justify-content: center; gap: 10px; padding: 15px; background-color: var(--panel-bg); flex-wrap: wrap; min-height: 140px; align-items: center; }
@@ -131,7 +146,7 @@
         </div>
     </header>
 
-    <div class="container" id="main-menu">
+    <div class="container hidden" id="main-menu">
         <div class="menu-card">
             <h2>اختار طريقة اللعب</h2>
             <button onclick="showScreen('offline-setup')">🤖 العب أوفلاين (مع البوت)</button>
@@ -155,16 +170,21 @@
         </div>
     </div>
 
-    <div id="game-screen">
-        <div class="scoreboard">
-            <span class="score-item">سكورك أنت: <span id="ui-player-score">0</span></span>
-            <span style="color: #fff;">الهدف: <span id="ui-target-score">50</span></span>
-            <span class="score-bot">سكور البوت: <span id="ui-bot-score">0</span></span>
+    <div id="game-screen" class="hidden">
+        <div class="game-header">
+            <button onclick="exitToMenu()" style="background-color: #f44336; margin: 0;">🚪 خروج للرئيسية</button>
+            <div class="scoreboard">
+                <span class="score-item">سكورك أنت: <span id="ui-player-score">0</span></span>
+                <span style="color: #fff;">الهدف: <span id="ui-target-score">50</span></span>
+                <span class="score-bot">سكور البوت: <span id="ui-bot-score">0</span></span>
+            </div>
         </div>
 
-        <div style="text-align: center; padding: 10px;">
+        <div style="text-align: center; margin-top: 10px;">
             <h3 id="game-info" style="color: #00ff88;">الدور: دورك أنت</h3>
         </div>
+
+        <div class="bot-hand" id="bot-hand"></div>
         
         <div class="game-board" id="board">
             <p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>
@@ -195,16 +215,44 @@
         function showScreen(screenId) {
             document.querySelectorAll('.container, #game-screen').forEach(el => el.classList.add('hidden'));
             document.getElementById(screenId).classList.remove('hidden');
-            if(screenId === 'game-screen') document.getElementById('game-screen').style.display = 'flex';
+            if(screenId === 'game-screen') {
+                document.getElementById('game-screen').style.display = 'flex';
+            } else {
+                document.getElementById('game-screen').style.display = 'none';
+            }
+        }
+
+        function exitToMenu() {
+            if(confirm('متأكد إنك عايز تخرج؟ الجيم والسكور الحالي هيتمسحوا!')) {
+                clearSave();
+                showScreen('main-menu');
+            }
         }
 
         let deck = [], playersHands = [];
         let leftEnd = null, rightEnd = null;
         let currentTurn = 0; 
+        let tableBones = []; 
         
         let playerScore = 0;
         let botScore = 0;
         let targetScore = 50;
+        let gameActive = false;
+
+        function saveGame() {
+            if (!gameActive) return;
+            const gameState = {
+                deck, playersHands, leftEnd, rightEnd, currentTurn,
+                playerScore, botScore, targetScore, tableBones,
+                gameActive: true
+            };
+            localStorage.setItem('domino_spygame_save', JSON.stringify(gameState));
+        }
+
+        function clearSave() {
+            gameActive = false;
+            localStorage.removeItem('domino_spygame_save');
+        }
 
         function generateDeck() {
             deck = [];
@@ -230,6 +278,8 @@
                 }
             }
             updateDeckCountUI();
+            renderBotHand();
+            saveGame();
         }
 
         function updateDeckCountUI() {
@@ -237,6 +287,18 @@
             document.getElementById('ui-player-score').innerText = playerScore;
             document.getElementById('ui-bot-score').innerText = botScore;
             document.getElementById('ui-target-score').innerText = targetScore;
+        }
+
+        function renderBotHand() {
+            const botHandDiv = document.getElementById('bot-hand');
+            botHandDiv.innerHTML = '';
+            let bHand = playersHands[1];
+            if(!bHand) return;
+            for(let i = 0; i < bHand.length; i++) {
+                let backEl = document.createElement('div');
+                backEl.className = 'bot-domino-back';
+                botHandDiv.appendChild(backEl);
+            }
         }
 
         function createDominoHTML(n1, n2) {
@@ -282,14 +344,19 @@
             return hand.some(bone => bone[0] === leftEnd || bone[1] === leftEnd || bone[0] === rightEnd || bone[1] === rightEnd);
         }
 
-        function addDominoToBoardDOM(bone, side, flip, isBot = false) {
+        function addDominoToBoardDOM(bone, side, flip, isBot = false, isLoading = false) {
             const board = document.getElementById('board');
             const emptyMsg = document.getElementById('empty-msg');
             if(emptyMsg) emptyMsg.remove();
 
+            if (!isLoading) {
+                tableBones.push({ bone, side, flip, isBot });
+            }
+
             const isDouble = bone[0] === bone[1];
             const boneEl = document.createElement('div');
             boneEl.className = 'domino board-domino';
+            
             if (isBot) boneEl.style.boxShadow = "0 0 10px rgba(255, 68, 68, 0.8)"; 
             
             let htmlStr = '';
@@ -301,8 +368,15 @@
             }
             
             boneEl.innerHTML = htmlStr;
+            
             if (side === 'left') board.prepend(boneEl);
             else board.appendChild(boneEl);
+
+            setTimeout(() => {
+                boneEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }, 50);
+
+            if (!isLoading) saveGame();
         }
 
         function calculateHandScore(hand) {
@@ -316,12 +390,14 @@
             if (pHand.length === 0) {
                 let points = calculateHandScore(bHand);
                 playerScore += points;
+                clearSave(); 
                 endRoundAlert(`عاش! أنت خلصت ورقك وكسبت الجولة. خدت ${points} نقطة من البوت.`, playerScore, botScore);
                 return true;
             }
             if (bHand.length === 0) {
                 let points = calculateHandScore(pHand);
                 botScore += points;
+                clearSave();
                 endRoundAlert(`البوت خلص ورقه الأول! البوت خد ${points} نقطة.`, playerScore, botScore);
                 return true;
             }
@@ -331,6 +407,7 @@
             if (!pCanMove && !bCanMove && deck.length === 0) {
                 let pScore = calculateHandScore(pHand);
                 let bScore = calculateHandScore(bHand);
+                clearSave();
                 
                 if (pScore < bScore) {
                     playerScore += bScore;
@@ -353,9 +430,11 @@
                 
                 if (playerScore >= targetScore) {
                     alert("🎉 مبروووك! أنت كسبت الجيم كله!");
+                    clearSave();
                     showScreen('main-menu');
                 } else if (botScore >= targetScore) {
                     alert("💀 البوت كسب الجيم ده! هارد لك، جرب تاني.");
+                    clearSave();
                     showScreen('main-menu');
                 } else {
                     startNewRound(); 
@@ -366,13 +445,16 @@
         function startOfflineGame() {
             targetScore = parseInt(document.getElementById('off-score').value);
             playerScore = 0; botScore = 0;
+            gameActive = true;
             startNewRound();
             showScreen('game-screen');
         }
 
         function startNewRound() {
+            gameActive = true;
             document.getElementById('board').innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>';
             leftEnd = null; rightEnd = null;
+            tableBones = []; 
             generateDeck();
             shuffleDeck();
             dealCards(2);
@@ -384,6 +466,7 @@
             document.getElementById('game-info').innerText = `الدور: دورك أنت`;
             document.getElementById('game-info').style.color = `#00ff88`;
             renderHand(0);
+            saveGame();
 
             if (!hasValidMove(playersHands[0])) {
                 if (deck.length > 0) {
@@ -396,11 +479,13 @@
                             playersHands[0].push(drawnBone);
                             updateDeckCountUI();
                             renderHand(0);
+                            saveGame();
                         } else {
                             clearInterval(autoDraw);
                             if (hasValidMove(playersHands[0])) {
                                 document.getElementById('game-info').innerText = `الدور: دورك أنت (العب ورقة منورة)`;
                                 document.getElementById('game-info').style.color = `#00ff88`;
+                                saveGame();
                             } else {
                                 alert("البلاطة فضيت ومعكش لعب! الدور هيباصي للبوت.");
                                 passToBot();
@@ -420,10 +505,10 @@
             document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
             document.getElementById('game-info').style.color = `#ff4444`;
             renderHand(0); 
+            saveGame();
             setTimeout(botPlay, 1000);
         }
 
-        // --- التعديل الرئيسي اللي حل المشكلة هنا ---
         function playBone(playerIndex, boneIndex) {
             if (currentTurn !== playerIndex) return; 
 
@@ -446,20 +531,20 @@
             else if (playAt === 'left') leftEnd = flip ? bone[1] : bone[0];
 
             addDominoToBoardDOM(bone, playAt, flip, playerIndex !== 0);
-            renderHand(playerIndex); 
+            
+            if (playerIndex === 0) renderHand(0); 
+            else renderBotHand();
 
             if (checkRoundEnd()) return;
 
-            // اللوجيك الجديد: التبديل الصح للأدوار
             if (playerIndex === 0) {
-                // لو أنت اللي لعبت، الدور يروح للبوت
                 currentTurn = 1;
                 document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
                 document.getElementById('game-info').style.color = `#ff4444`;
                 renderHand(0); 
+                saveGame();
                 setTimeout(botPlay, 1200);
             } else {
-                // لو البوت هو اللي لعب، الدور يرجعلك
                 setTimeout(playerTurnInit, 500); 
             }
         }
@@ -477,6 +562,8 @@
                     if (deck.length > 0 && !hasValidMove(hand)) {
                         hand.push(deck.pop());
                         updateDeckCountUI();
+                        renderBotHand();
+                        saveGame();
                     } else {
                         clearInterval(drawInterval);
                         if (hasValidMove(hand)) executeBotMove();
@@ -504,6 +591,59 @@
             alert("البوت باصى الدور عشان معهوش لعب والبلاطة فاضية! 🛑");
             playerTurnInit(); 
         }
+
+        // --- الماكينة اللي بتشتغل أول ما الصفحة تفتح فوراً ---
+        function checkSavedGame() {
+            const savedData = localStorage.getItem('domino_spygame_save');
+            if (savedData) {
+                const state = JSON.parse(savedData);
+                if (state.gameActive) {
+                    // استرجاع المتغيرات
+                    deck = state.deck;
+                    playersHands = state.playersHands;
+                    leftEnd = state.leftEnd;
+                    rightEnd = state.rightEnd;
+                    currentTurn = state.currentTurn;
+                    playerScore = state.playerScore;
+                    botScore = state.botScore;
+                    targetScore = state.targetScore;
+                    tableBones = state.tableBones;
+                    gameActive = true;
+
+                    // تحديث الواجهة فوراً
+                    updateDeckCountUI();
+                    renderBotHand();
+                    showScreen('game-screen');
+
+                    // إعادة بناء الطاولة
+                    const board = document.getElementById('board');
+                    board.innerHTML = '';
+                    if (tableBones.length === 0) {
+                        board.innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center; position: absolute;">الطاولة فاضية، ابدأ اللعب</p>';
+                    } else {
+                        tableBones.forEach(item => {
+                            addDominoToBoardDOM(item.bone, item.side, item.flip, item.isBot, true);
+                        });
+                    }
+
+                    // استكمال الدور
+                    if (currentTurn === 0) {
+                        playerTurnInit();
+                    } else {
+                        document.getElementById('game-info').innerText = `الدور: دور البوت 🤖...`;
+                        document.getElementById('game-info').style.color = `#ff4444`;
+                        renderHand(0);
+                        setTimeout(botPlay, 1000);
+                    }
+                    return; // لو لقى جيم، بيخرج من الدالة وميظهرش القائمة
+                }
+            }
+            // لو مفيش جيم محفوظ، هيظهر القائمة الرئيسية
+            showScreen('main-menu');
+        }
+
+        // الاستدعاء المباشر للدالة عشان تشتغل أول حاجة وتمنع القائمة من الظهور
+        checkSavedGame();
     </script>
 </body>
 </html>
