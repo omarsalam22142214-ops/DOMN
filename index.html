@@ -39,7 +39,7 @@
         .score-item { color: #00ff88; }
         .score-bot { color: #ff4444; }
 
-        /* -------------- تصميم الشات والفويس -------------- */
+        /* -------------- الشات والفويس -------------- */
         .chat-btn { background-color: #2196f3; position: absolute; right: 20px; top: 70px; z-index: 100; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; padding: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         .chat-panel { position: absolute; right: -350px; top: 130px; width: 300px; height: 400px; background-color: var(--chat-bg); border-radius: 10px; border: 2px solid var(--btn-bg); display: flex; flex-direction: column; transition: right 0.3s ease; z-index: 99; box-shadow: -5px 5px 15px rgba(0,0,0,0.5); }
         .chat-panel.open { right: 20px; }
@@ -54,7 +54,7 @@
         .mic-btn.active { background-color: #f44336; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); } }
 
-        /* -------------- تصميم الدومنة -------------- */
+        /* -------------- الدومنة -------------- */
         .bot-hand { display: flex; justify-content: center; gap: 5px; margin-top: 15px; min-height: 70px; }
         .bot-domino-back { width: 35px; height: 70px; background: linear-gradient(135deg, #16213e 25%, #1a1a2e 25%, #1a1a2e 50%, #16213e 50%, #16213e 75%, #1a1a2e 75%, #1a1a2e 100%); background-size: 10px 10px; border-radius: 5px; border: 2px solid #000; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
         .game-board { flex: 1; background-color: var(--board-bg); border-radius: 15px; margin: 10px 20px; position: relative; display: flex; justify-content: center; align-items: center; flex-wrap: nowrap; overflow-x: auto; border: 10px solid #5c4033; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); padding: 20px; scroll-behavior: smooth; }
@@ -81,12 +81,12 @@
     <header>
         <h1>🎲 دومنة SpyGame</h1>
         <div>
-            <span id="connection-status" style="color: #4caf50; margin-left: 15px;">متصل بالنت</span>
+            <span id="connection-status" style="color: #4caf50; margin-left: 15px;">جاهز للعب</span>
             <button onclick="toggleTheme()">💡 تغيير المود</button>
         </div>
     </header>
 
-    <div class="container hidden" id="main-menu">
+    <div class="container" id="main-menu">
         <div class="menu-card">
             <h2>اختار طريقة اللعب</h2>
             <button onclick="showScreen('offline-setup')">🤖 العب أوفلاين (مع البوت)</button>
@@ -146,7 +146,6 @@
     </div>
 
     <div id="game-screen" class="hidden">
-        
         <button id="chat-toggle-btn" class="chat-btn hidden" onclick="toggleChat()">💬</button>
         <div id="chat-panel" class="chat-panel hidden">
             <div class="voice-controls">
@@ -188,18 +187,25 @@
     </div>
 
     <script>
-        // --- 1. إعدادات Firebase ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBtIkF-UhkeFa-cxutgJAQpR7K_IjKxloc",
-            authDomain: "spygame-337ee.firebaseapp.com",
-            databaseURL: "https://spygame-337ee-default-rtdb.firebaseio.com", 
-            projectId: "spygame-337ee",
-            storageBucket: "spygame-337ee.firebasestorage.app"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        // --- حماية للـ Firebase عشان الصفحة ماتضربش لو أنت فاتح من الكمبيوتر محلياً ---
+        let db = null;
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyBtIkF-UhkeFa-cxutgJAQpR7K_IjKxloc",
+                authDomain: "spygame-337ee.firebaseapp.com",
+                databaseURL: "https://spygame-337ee-default-rtdb.firebaseio.com", 
+                projectId: "spygame-337ee",
+                storageBucket: "spygame-337ee.firebasestorage.app"
+            };
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+        } catch (error) {
+            console.warn("الفايربيز محملش، اللعب الأوفلاين هيشتغل عادي.");
+            document.getElementById('connection-status').innerText = "متصل أوفلاين فقط";
+            document.getElementById('connection-status').style.color = "#ff9800";
+        }
 
-        // --- 2. متغيرات اللعبة الأساسية (Offline & Online) ---
+        // --- متغيرات اللعبة الأساسية ---
         let currentMode = 'offline'; 
         let deck = [], playersHands = [];
         let leftEnd = null, rightEnd = null, leftEndIsDouble = false, rightEndIsDouble = false;
@@ -207,12 +213,11 @@
         let playerScore = 0, botScore = 0, targetScore = 50;
         let gameMode = 'normal', botLevel = 'easy', gameActive = false;
         
-        // --- متغيرات الأونلاين والشات ---
         let onlineRoomId = null, myPlayerId = null, myName = "لاعب";
         let localStream, peerConnection, isMicOn = false;
         const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
-        // --- 3. دوال الواجهة والتحكم ---
+        // --- دوال الواجهة والتحكم ---
         function toggleTheme() {
             const root = document.documentElement;
             root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
@@ -221,7 +226,11 @@
         function showScreen(screenId) {
             document.querySelectorAll('.container, #game-screen').forEach(el => el.classList.add('hidden'));
             document.getElementById(screenId).classList.remove('hidden');
-            if(screenId === 'game-screen') document.getElementById('game-screen').style.display = 'flex';
+            if(screenId === 'game-screen') {
+                document.getElementById('game-screen').style.display = 'flex';
+            } else {
+                document.getElementById('game-screen').style.display = 'none';
+            }
         }
 
         function exitToMenu() {
@@ -233,10 +242,11 @@
             }
         }
 
-        // --- 4. نظام الشات والفويس (الأونلاين) ---
+        // --- الشات والفويس (الأونلاين) ---
         function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }
 
         function sendChatMessage() {
+            if(!db) return alert("الفايربيز مش شغال عندك.");
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (!text || !onlineRoomId) return;
@@ -245,6 +255,7 @@
         }
 
         function listenToChat() {
+            if(!db) return;
             const messagesDiv = document.getElementById('chat-messages');
             messagesDiv.innerHTML = ''; 
             db.ref(`rooms/${onlineRoomId}/chat`).on('child_added', snapshot => {
@@ -261,15 +272,22 @@
             peerConnection = new RTCPeerConnection(servers);
             peerConnection.ontrack = event => { document.getElementById('remote-audio').srcObject = event.streams[0]; };
             peerConnection.onicecandidate = event => {
-                if (event.candidate) db.ref(`rooms/${onlineRoomId}/webrtc/candidates/${myPlayerId}`).push(event.candidate.toJSON());
+                if (event.candidate && db) db.ref(`rooms/${onlineRoomId}/webrtc/candidates/${myPlayerId}`).push(event.candidate.toJSON());
             };
             const otherPlayerId = (myPlayerId === 'p1') ? 'p2' : 'p1';
-            db.ref(`rooms/${onlineRoomId}/webrtc/candidates/${otherPlayerId}`).on('child_added', snapshot => {
-                peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
-            });
+            if(db) {
+                db.ref(`rooms/${onlineRoomId}/webrtc/candidates/${otherPlayerId}`).on('child_added', snapshot => {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+                });
+            }
         }
 
         async function toggleMic() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("للأسف الفويس شات مبيشتغلش وأنت فاتح اللعبة كملف من الكمبيوتر (file://)، عشان الحماية. لازم ترفعها على استضافة الأول.");
+                return;
+            }
+
             const micBtn = document.getElementById('mic-btn');
             if (!isMicOn) {
                 try {
@@ -280,18 +298,20 @@
                     if (myPlayerId === 'p1') {
                         const offer = await peerConnection.createOffer();
                         await peerConnection.setLocalDescription(offer);
-                        db.ref(`rooms/${onlineRoomId}/webrtc/offer`).set({ type: offer.type, sdp: offer.sdp });
+                        if(db) db.ref(`rooms/${onlineRoomId}/webrtc/offer`).set({ type: offer.type, sdp: offer.sdp });
                     } else {
-                        db.ref(`rooms/${onlineRoomId}/webrtc/offer`).once('value', async snapshot => {
-                            if (snapshot.val()) {
-                                await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
-                                const answer = await peerConnection.createAnswer();
-                                await peerConnection.setLocalDescription(answer);
-                                db.ref(`rooms/${onlineRoomId}/webrtc/answer`).set({ type: answer.type, sdp: answer.sdp });
-                            }
-                        });
+                        if(db) {
+                            db.ref(`rooms/${onlineRoomId}/webrtc/offer`).once('value', async snapshot => {
+                                if (snapshot.val()) {
+                                    await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
+                                    const answer = await peerConnection.createAnswer();
+                                    await peerConnection.setLocalDescription(answer);
+                                    db.ref(`rooms/${onlineRoomId}/webrtc/answer`).set({ type: answer.type, sdp: answer.sdp });
+                                }
+                            });
+                        }
                     }
-                    if (myPlayerId === 'p1') {
+                    if (myPlayerId === 'p1' && db) {
                         db.ref(`rooms/${onlineRoomId}/webrtc/answer`).on('value', snapshot => {
                             if (snapshot.val() && !peerConnection.currentRemoteDescription) peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
                         });
@@ -305,6 +325,7 @@
         }
 
         function createRoom() {
+            if(!db) return alert("مش هينفع تلعب أونلاين عشان اتصال الفايربيز متعطل عندك.");
             myName = document.getElementById('player-name').value || "الهوست";
             onlineRoomId = 'ROOM-' + Math.floor(Math.random() * 10000);
             myPlayerId = 'p1';
@@ -315,6 +336,7 @@
         }
 
         function joinRoom() {
+            if(!db) return alert("مش هينفع تلعب أونلاين عشان اتصال الفايربيز متعطل عندك.");
             myName = document.getElementById('player-name').value || "الضيف";
             const roomCode = document.getElementById('room-code').value.trim();
             if(!roomCode) return alert("اكتب رقم الغرفة!");
@@ -335,7 +357,7 @@
             showScreen('game-screen');
         }
 
-        // --- 5. نظام الحفظ (Local Storage) عشان الريفريش ---
+        // --- الحفظ للريفريش ---
         function saveGame() {
             if (!gameActive || currentMode !== 'offline') return;
             const gameState = { deck, playersHands, leftEnd, rightEnd, currentTurn, playerScore, botScore, targetScore, tableBones, leftEndIsDouble, rightEndIsDouble, gameMode, botLevel, gameActive: true };
@@ -344,7 +366,7 @@
 
         function clearSave() { gameActive = false; localStorage.removeItem('domino_spygame_save'); }
 
-        // --- 6. اللوجيك الكامل للعبة الدومنة ---
+        // --- اللوجيك الخاص بالدومنة ---
         function generateDeck() { deck = []; for (let i = 0; i <= 6; i++) { for (let j = i; j <= 6; j++) { deck.push([i, j]); } } }
         function shuffleDeck() { for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; } }
 
@@ -637,9 +659,9 @@
                     }
                 }
             } catch (error) { clearSave(); }
-            showScreen('main-menu');
         }
 
+        // --- الماكينة بتشتغل هنا أول ما تفتح ---
         window.onload = checkSavedGame;
     </script>
 </body>
