@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الدومنة - SpyGame</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root[data-theme="dark"] {
+            --bg-color: #1a1a2e;
+            --panel-bg: #16213e;
+            --text-color: #e94560;
+            --text-main: #fff;
+            --board-bg: #0f3418;
+            --btn-bg: #e94560;
+            --btn-hover: #d1304b;
+        }
+
+        :root[data-theme="light"] {
+            --bg-color: #f0f0f0;
+            --panel-bg: #ffffff;
+            --text-color: #333;
+            --text-main: #111;
+            --board-bg: #2e7d32;
+            --btn-bg: #1976d2;
+            --btn-hover: #1565c0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body { background-color: var(--bg-color); color: var(--text-main); transition: all 0.3s ease; height: 100vh; display: flex; flex-direction: column; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: var(--panel-bg); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        button { background-color: var(--btn-bg); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.3s; margin: 5px; }
+        button:hover { background-color: var(--btn-hover); }
+
+        .container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
+
+        .menu-card { background-color: var(--panel-bg); padding: 40px; border-radius: 15px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.5); width: 100%; max-width: 500px; }
+        .menu-card h2 { color: var(--text-color); margin-bottom: 20px; }
+        
+        .form-group { margin-bottom: 15px; text-align: right; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group select, .form-group input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; background: #fff; color: #333; }
+
+        #game-screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+        
+        .game-board {
+            flex: 1;
+            background-color: var(--board-bg);
+            border-radius: 15px;
+            margin: 20px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            align-content: center;
+            border: 10px solid #5c4033;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            padding: 20px;
+        }
+
+        .player-hand { display: flex; justify-content: center; gap: 10px; padding: 15px; background-color: var(--panel-bg); flex-wrap: wrap; }
+
+        /* -------------- تصميم الدومنة الحقيقي -------------- */
+        .domino {
+            width: 50px;
+            height: 100px;
+            background-color: #fdf5e6; /* لون العاج */
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #222;
+            box-shadow: 3px 3px 6px rgba(0,0,0,0.6), inset 0 0 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+            padding: 4px;
+            transition: transform 0.2s;
+        }
+        
+        .domino:hover { transform: translateY(-10px); }
+
+        .domino .half {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            align-items: center;
+            justify-items: center;
+        }
+
+        .domino .divider {
+            height: 2px;
+            background-color: #222;
+            width: 100%;
+            margin: 2px 0;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            background-color: #111;
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.4);
+        }
+
+        /* تعديل حجم الدومنة وهي على الطاولة (عشان لو لفت) */
+        .board-domino {
+            margin: 5px;
+            cursor: default;
+        }
+        .board-domino:hover { transform: none; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎲 دومنة SpyGame</h1>
+        <div>
+            <span id="connection-status" style="color: #4caf50; margin-left: 15px;">متصل بالنت</span>
+            <button onclick="toggleTheme()">💡 تغيير المود</button>
+        </div>
+    </header>
+
+    <div class="container" id="main-menu">
+        <div class="menu-card">
+            <h2>اختار طريقة اللعب</h2>
+            <button onclick="showScreen('offline-setup')">🤖 العب أوفلاين (مع البوت)</button>
+            <hr style="margin: 20px 0; border-color: rgba(255,255,255,0.1);">
+            <button onclick="showScreen('online-setup')">🌐 العب أونلاين</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="offline-setup">
+        <div class="menu-card">
+            <h2>إعدادات اللعب مع البوت</h2>
+            <div class="form-group">
+                <label>عدد اللاعبين:</label>
+                <select id="off-players">
+                    <option value="2">2 (زوجي)</option>
+                    <option value="3">3 لاعبين</option>
+                    <option value="4">4 لاعبين</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>الهدف (السكور):</label>
+                <select id="off-score">
+                    <option value="50">50 نقطة</option>
+                    <option value="100">100 نقطة</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مستوى البوت:</label>
+                <select id="off-bot-level">
+                    <option value="easy">سهل (بيلعب عشوائي)</option>
+                    <option value="medium">متوسط</option>
+                    <option value="hard">صعب (بيحسب الورق)</option>
+                </select>
+            </div>
+            <button onclick="startOfflineGame()">🚀 ابدأ اللعب</button>
+            <button onclick="showScreen('main-menu')" style="background-color: #555;">رجوع</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="online-setup">
+        <div class="menu-card">
+            <h2>لعب أونلاين</h2>
+            <div class="form-group">
+                <label>رقم الغرفة (عشان تنضم):</label>
+                <input type="text" id="room-code" placeholder="مثال: ROOM-123">
+            </div>
+            <button onclick="joinRoom()">🔗 انضم للغرفة</button>
+            <hr style="margin: 20px 0; border-color: rgba(255,255,255,0.1);">
+            <h3>أو</h3>
+            <button onclick="createRoom()">➕ أنشئ غرفة جديدة</button>
+            <br><br>
+            <button onclick="showScreen('main-menu')" style="background-color: #555;">رجوع</button>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div style="text-align: center; padding: 10px;">
+            <h3 id="game-info">الغرفة: أوفلاين | الهدف: 50 | دورك</h3>
+        </div>
+        
+        <div class="game-board" id="board">
+            <p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center;">الطاولة فاضية، ابدأ اللعب</p>
+        </div>
+
+        <div class="player-hand" id="my-hand"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtIkF-UhkeFa-cxutgJAQpR7K_IjKxloc",
+            authDomain: "spygame-337ee.firebaseapp.com",
+            databaseURL: "https://spygame-337ee-default-rtdb.firebaseio.com", 
+            projectId: "spygame-337ee",
+            storageBucket: "spygame-337ee.firebasestorage.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function toggleTheme() {
+            const root = document.documentElement;
+            root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.container, #game-screen').forEach(el => el.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+            if(screenId === 'game-screen') document.getElementById('game-screen').style.display = 'flex';
+        }
+
+        let deck = [], playersHands = [], tableBones = [];
+
+        function generateDeck() {
+            deck = [];
+            for (let i = 0; i <= 6; i++) {
+                for (let j = i; j <= 6; j++) {
+                    deck.push([i, j]);
+                }
+            }
+        }
+
+        function shuffleDeck() {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function dealCards(numPlayers) {
+            playersHands = Array.from({ length: numPlayers }, () => []);
+            for (let i = 0; i < 7; i++) {
+                for (let p = 0; p < numPlayers; p++) {
+                    playersHands[p].push(deck.pop());
+                }
+            }
+        }
+
+        // --- دالة رسم النقط (الـ Dots) بناءً على الرقم ---
+        function createDominoHTML(n1, n2) {
+            function getHalf(num) {
+                // مواقع النقط في شبكة 3x3 (أرقام المربعات من 0 لـ 8)
+                const patterns = {
+                    0: [],
+                    1: [4],
+                    2: [0, 8],
+                    3: [0, 4, 8],
+                    4: [0, 2, 6, 8],
+                    5: [0, 2, 4, 6, 8],
+                    6: [0, 2, 3, 5, 6, 8]
+                };
+                let html = '<div class="half">';
+                for(let i = 0; i < 9; i++) {
+                    if(patterns[num].includes(i)) {
+                        html += '<div class="dot"></div>';
+                    } else {
+                        html += '<div></div>'; // مربع فاضي عشان يحافظ على أبعاد الشبكة
+                    }
+                }
+                html += '</div>';
+                return html;
+            }
+            return getHalf(n1) + '<div class="divider"></div>' + getHalf(n2);
+        }
+
+        function renderHand(handIndex) {
+            const handDiv = document.getElementById('my-hand');
+            handDiv.innerHTML = ''; 
+
+            playersHands[handIndex].forEach((bone, index) => {
+                const boneEl = document.createElement('div');
+                boneEl.className = 'domino';
+                boneEl.innerHTML = createDominoHTML(bone[0], bone[1]);
+                boneEl.onclick = () => playBone(handIndex, index);
+                handDiv.appendChild(boneEl);
+            });
+        }
+
+        function playBone(playerIndex, boneIndex) {
+            let playedBone = playersHands[playerIndex].splice(boneIndex, 1)[0];
+            tableBones.push(playedBone);
+            renderHand(playerIndex);
+            
+            const board = document.getElementById('board');
+            const emptyMsg = document.getElementById('empty-msg');
+            if(emptyMsg) emptyMsg.remove();
+            
+            const boneEl = document.createElement('div');
+            boneEl.className = 'domino board-domino';
+            
+            // عشان ندي شكل واقعي شوية على الطاولة ممكن نخلي الورق يلف
+            // بس للتبسيط دلوقتي هنرصه جنب بعضه
+            boneEl.innerHTML = createDominoHTML(playedBone[0], playedBone[1]);
+            board.appendChild(boneEl);
+
+            if(currentMode === 'offline') {
+                setTimeout(botPlay, 1000);
+            }
+        }
+
+        let currentMode = '';
+        function startOfflineGame() {
+            currentMode = 'offline';
+            const numPlayers = parseInt(document.getElementById('off-players').value);
+            const targetScore = document.getElementById('off-score').value;
+            const botLevel = document.getElementById('off-bot-level').value;
+
+            document.getElementById('game-info').innerText = `أوفلاين | لاعبين: ${numPlayers} | الهدف: ${targetScore} | مستوى البوت: ${botLevel}`;
+            
+            document.getElementById('board').innerHTML = '<p id="empty-msg" style="color: rgba(255,255,255,0.5); width: 100%; text-align: center;">الطاولة فاضية، ابدأ اللعب</p>';
+            tableBones = [];
+            generateDeck();
+            shuffleDeck();
+            dealCards(numPlayers);
+            renderHand(0);
+            showScreen('game-screen');
+        }
+
+        function botPlay() {
+            if(playersHands[1] && playersHands[1].length > 0) {
+                let botBone = playersHands[1].splice(0, 1)[0];
+                tableBones.push(botBone);
+                
+                const board = document.getElementById('board');
+                const emptyMsg = document.getElementById('empty-msg');
+                if(emptyMsg) emptyMsg.remove();
+
+                const boneEl = document.createElement('div');
+                boneEl.className = 'domino board-domino';
+                // تلوين خفيف لورق البوت عشان تميزه على الطاولة
+                boneEl.style.boxShadow = "0 0 10px rgba(255, 0, 0, 0.5)"; 
+                boneEl.innerHTML = createDominoHTML(botBone[0], botBone[1]);
+                board.appendChild(boneEl);
+            }
+        }
+
+        function createRoom() {
+            const roomId = 'ROOM-' + Math.floor(Math.random() * 10000);
+            db.ref('rooms/' + roomId).set({ status: 'waiting', players: 1, board: [], turn: 0 })
+            .then(() => {
+                alert('تم إنشاء الغرفة! رقم الغرفة: ' + roomId);
+                document.getElementById('game-info').innerText = `أونلاين | الغرفة: ${roomId} | في انتظار اللاعبين...`;
+                showScreen('game-screen');
+            }).catch(error => alert('حصل مشكلة: ' + error.message));
+        }
+
+        function joinRoom() {
+            const roomId = document.getElementById('room-code').value.trim();
+            if(!roomId) return alert('اكتب رقم الغرفة الأول!');
+
+            db.ref('rooms/' + roomId).once('value').then(snapshot => {
+                if(snapshot.exists()) {
+                    db.ref('rooms/' + roomId).update({ players: snapshot.val().players + 1 });
+                    document.getElementById('game-info').innerText = `أونلاين | الغرفة: ${roomId} | متصل`;
+                    showScreen('game-screen');
+                } else alert('الغرفة مش موجودة!');
+            });
+        }
+    </script>
+</body>
+</html>
