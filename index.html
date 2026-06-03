@@ -75,6 +75,20 @@
         .action-panel { display: flex; justify-content: center; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 5px; font-weight: bold; }
         .hidden { display: none !important; }
     </style>
+
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#94b082">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.log('SW Failed', err));
+        });
+      }
+    </script>
 </head>
 <body>
 
